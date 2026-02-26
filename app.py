@@ -8,11 +8,11 @@ import os
 
 # --- APP CONFIG ---
 st.set_page_config(page_title="MindGuard AI", layout="wide")
-st.title("🧠 MindGuard: Schizophrenia Biomarker Analysis")
+st.title(" MindGuard: Schizophrenia Biomarker Analysis")
 st.markdown("Early-stage detection using real-time EEG spectral analysis.")
 
 # --- 1. RESEARCH DATASET PIPELINE (Deliverable) ---
-st.sidebar.header("📂 Data Pipeline")
+st.sidebar.header("Data Pipeline")
 uploaded_file = st.sidebar.file_uploader("Upload Patient EEG (.edf, .fif)", type=["edf", "fif"])
 
 col1, col2 = st.columns([2, 1])
@@ -41,7 +41,7 @@ if uploaded_file:
         raw.filter(l_freq=1.0, h_freq=45.0, verbose=False)
         
         with col1:
-            st.subheader("📊 EEG Signal Stream")
+            st.subheader(" EEG Signal Stream")
             selected_ch = st.selectbox("Focus Channel", raw.ch_names)
             
             # Plot Time-Series
@@ -51,7 +51,7 @@ if uploaded_file:
             st.plotly_chart(fig_line, use_container_width=True)
 
             # --- 3. EXPLAINABLE BRAIN VISUALIZATION (Deliverable) ---
-            st.subheader("📍 Brain Activity Heatmap (XAI)")
+            st.subheader(" Brain Activity Heatmap (XAI)")
             psds = raw.compute_psd(fmin=1, fmax=40, verbose=False)
             psd_data, freqs = psds.get_data(return_freqs=True)
             mean_power = np.mean(psd_data, axis=1) 
@@ -65,7 +65,7 @@ if uploaded_file:
 
         with col2:
             # --- 4. EARLY RISK SCORING (Deliverable: Real-Time) ---
-            st.subheader("🎯 Real-Time Risk Assessment")
+            st.subheader(" Real-Time Risk Assessment")
             
             # DAR Calculation Logic (Delta-Alpha Ratio)
             delta_mask = (freqs >= 1) & (freqs <= 4)
@@ -81,11 +81,11 @@ if uploaded_file:
             st.metric(label="Neuro-Anomaly Score", value=f"{calculated_risk}%", delta=f"{dar_index:.2f} DAR Index")
             
             if calculated_risk > 70:
-                st.error("🚨 HIGH RISK: Significant biomarkers detected.")
+                st.error(" HIGH RISK: Significant biomarkers detected.")
             elif calculated_risk > 40:
-                st.warning("⚠️ MODERATE RISK: Spectral anomalies observed.")
+                st.warning(" MODERATE RISK: Spectral anomalies observed.")
             else:
-                st.success("✅ LOW RISK: Normal spectral distribution.")
+                st.success(" LOW RISK: Normal spectral distribution.")
 
             st.markdown(f"""
             **Biomarker Breakdown:**
@@ -97,7 +97,7 @@ if uploaded_file:
             st.divider()
             
             # Sensor Mapping (Proof of Technical Pipeline)
-            st.subheader("📍 Sensor Mapping")
+            st.subheader(" Sensor Mapping")
             fig_sensors = raw.plot_sensors(show_names=True, show=False)
             fig_sensors.patch.set_facecolor('#0e1117')
             st.pyplot(fig_sensors)
@@ -109,7 +109,7 @@ if uploaded_file:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 else:
-    st.info("👋 Welcome! Please upload an EEG file (.edf or .fif) to generate a risk assessment report.")
+    st.info(" Welcome! Please upload an EEG file (.edf or .fif) to generate a risk assessment report.")
     st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/1/11/EEG_10-20_system_with_standard_electrode_names.svg/440px-EEG_10-20_system_with_standard_electrode_names.svg.png", width=300)
 
 st.divider()
