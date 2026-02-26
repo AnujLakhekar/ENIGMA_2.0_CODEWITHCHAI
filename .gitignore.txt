@@ -1,0 +1,5 @@
+__pycache__/
+.streamlit/
+temp_eeg_*.edf
+*.pyc
+.env

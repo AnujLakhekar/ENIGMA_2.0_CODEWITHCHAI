@@ -1,0 +1,7 @@
+streamlit
+mne
+numpy
+plotly
+matplotlib
+pandas
+fpdf

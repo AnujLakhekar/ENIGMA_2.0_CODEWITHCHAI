@@ -5,112 +5,129 @@ import plotly.express as px
 import matplotlib.pyplot as plt
 import tempfile
 import os
+import time
+import pandas as pd
+from fpdf import FPDF
 
 # --- APP CONFIG ---
-st.set_page_config(page_title="MindGuard AI", layout="wide")
-st.title(" MindGuard: Schizophrenia Biomarker Analysis")
-st.markdown("Early-stage detection using real-time EEG spectral analysis.")
+st.set_page_config(page_title="MindGuard AI", page_icon="🧠", layout="wide")
+st.title("🧠 MindGuard: Schizophrenia Biomarker Analysis")
 
-# --- 1. RESEARCH DATASET PIPELINE (Deliverable) ---
-st.sidebar.header("Data Pipeline")
+# --- 1. DATA PIPELINE ---
+st.sidebar.header("📂 Data Pipeline")
 uploaded_file = st.sidebar.file_uploader("Upload Patient EEG (.edf, .fif)", type=["edf", "fif"])
+
+st.sidebar.divider()
+st.sidebar.header("🕹️ Live Stream Control")
+live_stream = st.sidebar.toggle("Simulate Live Signal Stream")
+stream_speed = st.sidebar.select_slider("Stream Speed", options=["Slow", "Normal", "Fast"], value="Slow")
 
 col1, col2 = st.columns([2, 1])
 
 if uploaded_file:
-    # Handle File Buffering for MNE
     with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(uploaded_file.name)[1]) as tmp:
         tmp.write(uploaded_file.getvalue())
         tmp_path = tmp.name
 
     try:
-        # Load Data
         if uploaded_file.name.lower().endswith('.edf'):
             raw = mne.io.read_raw_edf(tmp_path, preload=True, verbose=False)
         else:
             raw = mne.io.read_raw_fif(tmp_path, preload=True, verbose=False)
 
-        # Standardize channel names for 10-20 Mapping
         raw.rename_channels(lambda x: x.replace('EEG ', '').replace('-Ref', '').strip())
-        
-        # Apply the 10-20 Montage for Spatial Visualization
         montage = mne.channels.make_standard_montage('standard_1020')
         raw.set_montage(montage, on_missing='ignore')
-
-        # --- 2. EEG ANALYSIS INTERFACE (Deliverable) ---
         raw.filter(l_freq=1.0, h_freq=45.0, verbose=False)
-        
-        with col1:
-            st.subheader(" EEG Signal Stream")
-            selected_ch = st.selectbox("Focus Channel", raw.ch_names)
-            
-            # Plot Time-Series
-            data, times = raw[raw.ch_names.index(selected_ch), :1500]
-            fig_line = px.line(x=times, y=data[0]*1e6, labels={'x':'Time (s)', 'y':'Amplitude (μV)'})
-            fig_line.update_layout(template="plotly_dark", height=300, margin=dict(l=20, r=20, t=20, b=20))
-            st.plotly_chart(fig_line, use_container_width=True)
 
-            # --- 3. EXPLAINABLE BRAIN VISUALIZATION (Deliverable) ---
-            st.subheader(" Brain Activity Heatmap (XAI)")
+        with col1:
+            st.subheader("📊 EEG Analysis Interface")
+            selected_ch = st.selectbox("Select Monitor Channel", raw.ch_names)
+            
+            if live_stream:
+                placeholder = st.empty()
+                sleep_time = {"Slow": 0.4, "Normal": 0.1, "Fast": 0.02}[stream_speed]
+                # Slower animation: smaller steps
+                for i in range(0, 300, 5):
+                    data, times = raw[raw.ch_names.index(selected_ch), i:i+150]
+                    fig_live = px.line(x=times, y=data[0]*1e6, labels={'x':'Time (s)', 'y':'uV'})
+                    fig_live.update_layout(template="plotly_white", height=300, yaxis_range=[-80, 80])
+                    placeholder.plotly_chart(fig_live, use_container_width=True)
+                    time.sleep(sleep_time)
+            else:
+                data, times = raw[raw.ch_names.index(selected_ch), :1500]
+                fig_static = px.line(x=times, y=data[0]*1e6, template="plotly_white", height=300)
+                st.plotly_chart(fig_static, use_container_width=True)
+
+            st.subheader("📍 Brain Activity Heatmap (XAI)")
             psds = raw.compute_psd(fmin=1, fmax=40, verbose=False)
             psd_data, freqs = psds.get_data(return_freqs=True)
-            mean_power = np.mean(psd_data, axis=1) 
-
-            # Create Topomap using Matplotlib
-            fig_map, ax = plt.subplots(figsize=(5, 5))
-            fig_map.patch.set_facecolor('#0e1117') # Match Streamlit Dark Theme
-            mne.viz.plot_topomap(mean_power, raw.info, axes=ax, show=False, contours=0, cmap='Reds')
+            fig_map, ax_map = plt.subplots(figsize=(5, 5))
+            fig_map.patch.set_facecolor('white')
+            mne.viz.plot_topomap(np.mean(psd_data, axis=1), raw.info, axes=ax_map, show=False, cmap='Reds', contours=0)
             st.pyplot(fig_map)
-            st.caption("Red areas indicate regions with higher biomarker activity (typically Frontal/Temporal in Schizophrenia).")
 
         with col2:
-            # --- 4. EARLY RISK SCORING (Deliverable: Real-Time) ---
-            st.subheader(" Real-Time Risk Assessment")
+            st.subheader("🎯 Risk Assessment")
+            d_p = psd_data[:, (freqs>=1)&(freqs<=4)].mean()
+            a_p = psd_data[:, (freqs>=8)&(freqs<=12)].mean()
+            dar = d_p / (a_p + 1e-10)
+            risk = min(int((dar/3.0)*100), 100)
             
-            # DAR Calculation Logic (Delta-Alpha Ratio)
-            delta_mask = (freqs >= 1) & (freqs <= 4)
-            alpha_mask = (freqs >= 8) & (freqs <= 12)
+            st.metric("Neuro-Anomaly Score", f"{risk}%", f"{dar:.2f} DAR")
             
-            delta_power = psd_data[:, delta_mask].mean()
-            alpha_power = psd_data[:, alpha_mask].mean()
+            st.subheader("📝 Clinical Report")
+            status = "High" if risk > 70 else "Moderate" if risk > 40 else "Low"
             
-            # Clinical Ratio: Higher Delta/Alpha usually correlates with neural slowing/Schizophrenia
-            dar_index = delta_power / (alpha_power + 1e-10) 
-            calculated_risk = min(int((dar_index / 3.0) * 100), 100)
-            
-            st.metric(label="Neuro-Anomaly Score", value=f"{calculated_risk}%", delta=f"{dar_index:.2f} DAR Index")
-            
-            if calculated_risk > 70:
-                st.error(" HIGH RISK: Significant biomarkers detected.")
-            elif calculated_risk > 40:
-                st.warning(" MODERATE RISK: Spectral anomalies observed.")
-            else:
-                st.success(" LOW RISK: Normal spectral distribution.")
+            # --- FIXED PDF GENERATION ---
+            if st.button("📄 Generate PDF Report"):
+                try:
+                    pdf = FPDF()
+                    pdf.add_page()
+                    # Header
+                    pdf.set_font("Arial", 'B', 20)
+                    pdf.cell(0, 15, "MINDGUARD AI REPORT", ln=True, align='C')
+                    pdf.set_font("Arial", 'B', 12)
+                    pdf.cell(0, 10, "Clinical Biomarker Assessment", ln=True, align='C')
+                    pdf.ln(10)
+                    
+                    # Data Points
+                    pdf.set_font("Arial", size=12)
+                    pdf.cell(0, 10, f"File Analyzed: {uploaded_file.name}", ln=True)
+                    pdf.cell(0, 10, f"Analysis Date: {time.strftime('%Y-%m-%d %H:%M')}", ln=True)
+                    pdf.cell(0, 10, f"Risk Level: {status.upper()}", ln=True)
+                    pdf.cell(0, 10, f"Neuro-Anomaly Score: {risk}%", ln=True)
+                    pdf.cell(0, 10, f"Delta-Alpha Ratio (DAR): {dar:.2f}", ln=True)
+                    
+                    pdf.ln(20)
+                    pdf.set_font("Arial", 'I', 10)
+                    pdf.multi_cell(0, 10, "Note: This report is generated by an AI prototype for hackathon demonstration. It is not a replacement for professional psychiatric diagnosis.")
+                    
+                    # Output as binary
+                    pdf_bytes = pdf.output(dest='S').encode('latin-1', errors='ignore')
+                    st.download_button(label="📥 Click to Download PDF", data=pdf_bytes, file_name="MindGuard_Report.pdf", mime="application/pdf")
+                except Exception as pdf_err:
+                    st.error(f"PDF Error: {pdf_err}")
 
-            st.markdown(f"""
-            **Biomarker Breakdown:**
-            - **Delta Power (1-4Hz):** {delta_power:.2e}
-            - **Alpha Power (8-12Hz):** {alpha_power:.2e}
-            - **Status:** {'Abnormal' if dar_index > 2.0 else 'Stable'}
-            """)
-            
             st.divider()
+            st.subheader("📍 Sensor Mapping")
             
-            # Sensor Mapping (Proof of Technical Pipeline)
-            st.subheader(" Sensor Mapping")
-            fig_sensors = raw.plot_sensors(show_names=True, show=False)
-            fig_sensors.patch.set_facecolor('#0e1117')
-            st.pyplot(fig_sensors)
+            try:
+                fig_sensors, ax_sensors = plt.subplots(figsize=(4, 4))
+                fig_sensors.patch.set_facecolor('white')
+                ax_sensors.set_facecolor('white')
+                raw.plot_sensors(show_names=True, axes=ax_sensors, show=False)
+                ax_sensors.axis('off')
+                st.pyplot(fig_sensors, clear_figure=True)
+            except Exception as e:
+                st.warning(f"Map Error: {e}")
 
     except Exception as e:
-        st.error(f"Processing Error: {e}")
-        st.info("Check if your EDF file contains standard 10-20 channel names (Fp1, Cz, etc.)")
+        st.error(f"Global Error: {e}")
     finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+        if os.path.exists(tmp_path): os.remove(tmp_path)
 else:
-    st.info(" Welcome! Please upload an EEG file (.edf or .fif) to generate a risk assessment report.")
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/1/11/EEG_10-20_system_with_standard_electrode_names.svg/440px-EEG_10-20_system_with_standard_electrode_names.svg.png", width=300)
+    st.info("Awaiting EEG data upload...")
 
 st.divider()
-st.caption("MindGuard AI | EEG Schizophrenia Detection Prototype | Hackathon 2026")
+st.caption("MindGuard AI | EEG Detection Prototype | Hackathon 2026")
