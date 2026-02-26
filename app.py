@@ -10,8 +10,8 @@ import pandas as pd
 from fpdf import FPDF
 
 # --- APP CONFIG ---
-st.set_page_config(page_title="MindGuard AI", page_icon="🧠", layout="wide")
-st.title("🧠 MindGuard: Schizophrenia Biomarker Analysis")
+st.set_page_config(page_title="Schizophrenia", page_icon="🧠", layout="wide")
+st.title(" MindGuard: Schizophrenia Biomarker Analysis")
 
 # --- 1. DATA PIPELINE ---
 st.sidebar.header("📂 Data Pipeline")
@@ -130,4 +130,4 @@ else:
     st.info("Awaiting EEG data upload...")
 
 st.divider()
-st.caption("MindGuard AI | EEG Detection Prototype | Hackathon 2026")
+st.caption("Schizophrenia | EEG Detection Prototype")
