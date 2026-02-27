@@ -16,6 +16,6 @@ Schizophrenia is an AI-powered clinical decision support tool designed for the e
 - **Reporting**: FPDF
 
 ## ⚙️ Installation
-1. Clone the repo: `git clone https://github.com/yourusername/MindGuard.git`
+1. Clone the repo: `git clone https://github.com/ENIGMA_2.0_CODEWITHCHAI/Schizophrenia.git`
 2. Install dependencies: `pip install -r requirements.txt`
 3. Run the app: `streamlit run app.py`
